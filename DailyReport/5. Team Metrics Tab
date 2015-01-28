@@ -1,0 +1,148 @@
+----------------------------------------GET Number of Active Vols
+drop table aomalley.activevols; --drop old active vols table
+select
+act.foname
+,count (distinct e.myc_vanid) as all_active_vols_30
+into aomalley.activevols
+from c2014_ky_coord_vansync.event_attendees_2014 e
+left join c2014_ky_coord_vansync.activityturfexport act on e.myc_vanid= act.vanid --join based on activity turf export
+where e.eventdate >= current_date - 30 --only include vols who have done an event in the past 30 days
+and e.eventdate < current_date
+and e.mrr_statusname='Completed' --only include those who have completed a shift
+and (e.eventtypename='Canvass' --only include those who have completed an action shift
+or e.eventtypename='Phone Bank'
+or e.eventtypename='Vol Recruitment'
+or e.eventtypename='Voter Registration'
+or e.eventid in (14729,14730,14737,14738,14718,14719,14720,14721))
+and e.volunteeractivityname not like '%Host%'
+group by 1;
+--------------------------------------Get count of volunteer occurrences by fo to calc supervols
+drop table aomalley.vo_fo; --drop old active vol counts table
+select
+t.foname
+,e.myc_vanid --get vanid of vols
+,count(*) as oc --count number of times a volunteers vanid appears aka how many times theyve completed a shift
+into aomalley.vo_fo --insert count of vol coccurrences in table
+from c2014_ky_coord_vansync.event_attendees_2014 e
+left join c2014_ky_coord_vansync.activityturfexport t on e.myc_vanid= t.vanid --join based on activity turf export
+where e.eventdate >= current_date - 30 --only include vols who have done an event in the past 30 days
+and e.eventdate < current_date
+and e.mrr_statusname='Completed' --only include those who have completed a shift
+and (e.eventtypename='Canvass' --only include those who have completed an action shift
+or e.eventtypename='Phone Bank'
+or e.eventtypename='Vol Recruitment'
+or e.eventtypename='Voter Registration'
+or e.eventid in (14729,14730,14737,14738,14718,14719,14720,14721))
+and e.volunteeractivityname not like '%Host%'
+group by 2,1
+order by 2;
+----------------------------------Get NTLs
+drop table aomalley.ntl;--drop old NTLs table
+select
+t.regionname
+,t.foname
+,count(case when s.surveyquestionid=168459
+and s.surveyresponseid=714764
+then s.vanid else null end) as confirmed --count number of confirmed NTLs based on SQ question and response
+,count(case when s.surveyquestionid=168459
+and (s.surveyresponseid=714762
+or s.surveyresponseid=714763
+or s.surveyresponseid=714761)
+then s.vanid else null end) as ntlprosptest --count number of NTL prospects plus NTL test 1s and test 2s based on SQ questions and responses
+,count(case when s.surveyquestionid=168459
+and s.surveyresponseid=714762
+then s.vanid else null end) as ntltest1 --count number of NTL test 1s based on SQ question and response
+,count(case when s.surveyquestionid=168459
+and s.surveyresponseid=714763
+then s.vanid else null end) as ntltest2 --count number of NTL test 2s based on SQ question and response
+,count(case when s.surveyquestionid=168459
+and s.surveyresponseid=714761
+then s.vanid else null end) as ntlprospect --count number of NTL prospects based on SQ question and response
+into aomalley.ntl --insert ntl counts into new table
+from c2014_ky_coord_vansync.surveyresponseexportmc_mrr as s --select lal from most recent survey response
+left join c2014_ky_coord_vansync.activityturfexport as t on s.vanid=t.vanid --left join activity based regions
+where t.foname not like '%CO%' --exlude campus organizers
+group by 1,2
+order by 1,2;
+----------------------------------Get CTMs
+drop table aomalley.ctm;-- drop old ctm table
+select
+t.regionname,
+t.foname
+,count(case when s.surveyquestionid=168460
+and s.surveyresponseid=714774
+then s.vanid else null end) as ctmconfphone --count number of conf phone CTMs based on SQ question and response
+,count(case when s.surveyquestionid=168460
+and s.surveyresponseid=714775
+then s.vanid else null end) as ctmconfcanvass--count number of conf canvass CTMs based on SQ question and response
+,count(case when s.surveyquestionid=168460
+and s.surveyresponseid=714776
+then s.vanid else null end) as ctmconfdata--count number of conf data CTMs based on SQ question and response
+,count(case when s.surveyquestionid=168460
+and s.surveyresponseid=714781
+then s.vanid else null end) as ctmconfother--count number of conf other CTMs based on SQ question and response
+,count(case when s.surveyquestionid=168460
+and (s.surveyresponseid=714772
+or s.surveyresponseid=714773
+or s.surveyresponseid=714771)
+then s.vanid else null end) as ctmprosptest--count number of CTM prospects plus CTM test 1s and test 2s based on SQ questions and responses
+,count(case when s.surveyquestionid=168460
+and s.surveyresponseid=714771
+then s.vanid else null end) as ctmprospect--count number of prospect CTMs based on SQ question and response
+,count(case when s.surveyquestionid=168460
+and s.surveyresponseid=714772
+then s.vanid else null end) as ctmtest1--count number of test 1 CTMs based on SQ question and response
+,count(case when s.surveyquestionid=168460
+and s.surveyresponseid=714773
+then s.vanid else null end) as ctmtest2--count number of test 2 CTMs based on SQ question and response
+into aomalley.ctm --insert ctm counts into new table
+from c2014_ky_coord_vansync.surveyresponseexportmc_mrr as s --pull from most recent survey response
+left join c2014_ky_coord_vansync.activityturfexport as t on s.vanid=t.vanid --join activity based regions
+where t.foname not like '%CO%' --exclude campus organizers
+group by 1,2
+order by 1,2;
+------------------------------Get total number of confirmed CTMs
+drop table aomalley.ctmtotal; --drop old ctm total table
+select
+regionname,
+foname,
+ctmconfphone,
+ctmconfcanvass,
+ctmconfdata,
+ctmconfother,
+(ctmconfphone + ctmconfcanvass + ctmconfdata + ctmconfother) as ctmtotalconf --get the sum of the counts of all types of confirmed ctms to be used to calculate ctm ptg
+into aomalley.ctmtotal --save total into a new table
+from aomalley.ctm;
+-------------------------------------Create tab for export
+select
+g.foname
+,coalesce(a.all_active_vols_30,0) as activevols --select number of active vols
+,coalesce(count(case when vo_fo.oc >= 2 then myc_vanid else null end),0) as super_vols --select number of super vols
+,coalesce(ntl.ntlprosptest,0) as ntlprosptest --select number of prospect ntls plus number of ntl test 1s and test 2s
+,coalesce(ntl.ntlprospect,0) as ntlprospect --select number of prospect ntls
+,coalesce(ntl.ntltest1,0) as ntltest1--select number of test 1 ntls
+,coalesce(ntl.ntltest2,0) as ntltest2--select number of test 2 ntls
+,coalesce(ntl.confirmed,0) as ntlconfirmed--select number of confirmed ntls
+,g.ntl_goal as ntlgoal --select ntl goal for this reporting week from the goals table
+,coalesce((cast(ntl.confirmed as float)/nullif(cast(g.ntl_goal as float),0)),0) as ntlptg --calculate ntl ptg for this week by dividing number of confirmed ntls by the ntl goal for this week
+,coalesce(ctm.ctmprosptest,0) as ctmprosptest --select number of prospect ctms plus number of ctm test 1s and test 2s
+,coalesce(ctm.ctmprospect,0) as ctmprospect --select number of prospect ctms
+,coalesce(ctm.ctmtest1,0) as ctmtest1--select number of test 1 ctms
+,coalesce(ctm.ctmtest2,0) as ctmtest2--select number of test 2 ctms
+,coalesce(ctm.ctmconfcanvass,0) as ctmconfcanvass--select number of conf canvass ctms
+,coalesce(ctm.ctmconfphone,0) as ctmconfphone--select number of conf phone ctms
+,coalesce(ctm.ctmconfdata,0) as ctmconfdata--select number of conf data ctms
+,coalesce(ctm.ctmconfother,0) as ctmconfother--select number of conf other ctms
+,coalesce(ctmtotal.ctmtotalconf,0) as ctmtotalconf--select number of total conf ctms from the ctm total table
+,g.ctm_goal as ctmgoal --select the ctm goal for this reporting week from the goals table
+,coalesce((cast(ctmtotal.ctmtotalconf as float)/nullif(cast(g.ctm_goal as float),0)),0) as ctmptg --calculate ctm ptg for this week by dividing number of total confirmed ctms by the ctm goal for this week
+from aomalley.goals g --select all goals from goals table
+left join aomalley.activevols a on a.foname=g.foname --only use active vol numbers for this week and match them to appropriate fo
+left join aomalley.vo_fo on g.foname=vo_fo.foname --incorporate super vols
+left join aomalley.ntl on g.foname = ntl.foname--incorporate ntls
+left join aomalley.ctm on g.foname = ctm.foname--incorporate ctms
+left join aomalley.ctmtotal on g.foname=ctmtotal.foname--incorporate total number of confirmed ctms
+where g.reporting_week = (current_date)-1-extract(dow from current_date+1)::int%7 --only select goals for current reporting week
+and g.foname is not null --do not select region names
+group by 1,2,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21
+order by 1;
