@@ -1,0 +1,111 @@
+-------------------------------------------------------DVC TAB----------------------------------------------------------
+-------------------------------GET DVC Phone & Door Contacts/Attempts
+drop table dvc;--drop old table holding dvc contacts and attempts
+select
+t.regionname
+,t.foname
+,count(case when
+contacttypeid=1 --only count canvass attempts by phone
+and c.datecanvassed >= (current_date)-1-extract(dow from current_date+1)::int%7 --limit to attempts this week
+and c.datecanvassed < current_date
+and inputtypeid<>4 --exclude bulk uploads
+and p.state_code ='KY' --limit to kentucky
+and c.committeeid = 41602 --limit to ALG committee
+then coalesce(p.primary_mailing_address_id,p.primary_voting_address_id) else null end) as dvcphoneattempts --****use addresses to count number of phone numbers called rather than number of people
+,count(case when
+resultid=14 --only count canvass attempts marked as canvassed AKA canvass contacts
+and contacttypeid=1 --only count canvass contacts made by phone
+and c.datecanvassed >= (current_date)-1-extract(dow from current_date+1)::int%7 --limit to contacts this week
+and c.datecanvassed < current_date
+and inputtypeid<>4 --exclude bulk uploads
+and p.state_code ='KY' --limit to kentucky
+and c.committeeid = 41602 --limit to ALG committee
+then coalesce(p.primary_mailing_address_id,p.primary_voting_address_id) else null end) as dvcphonecontacts --****use addresses to count number of phone numbers called rather than number of people
+,count(case when --this part counts number of phone attempts ever made in this phase to be used to calculate phase ptg
+contacttypeid=1 --only count canvass attempts by phone
+and c.datecanvassed >= '2014-09-05' --limit to calls made this phase which start sept 5th
+and c.datecanvassed < current_date
+and inputtypeid<>4 --exclude bulk uploads
+and p.state_code ='KY'--limit to kentucky
+and c.committeeid = 41602--limit to ALG committee
+then coalesce(p.primary_mailing_address_id,p.primary_voting_address_id) else null end) as dvcphoneattemptsever --****use addresses to count number of phone numbers called rather than number of people
+,count(distinct case when
+contacttypeid=2 --only count canvass attempts made by door knocking
+and c.datecanvassed >= (current_date)-1-extract(dow from current_date+1)::int%7 --limit to attempts made this week
+and c.datecanvassed < current_date
+and inputtypeid<>4 --exlude bulk uploads
+and p.state_code ='KY' --limit to state kentucky
+and c.committeeid = 41602 --limit to ALG committee
+then coalesce(p.primary_mailing_address_id,p.primary_voting_address_id) else null end) as dvcdoorattempts--use addresses to count number of doors knocked rather than number of people
+,count(distinct case when
+resultid=14 --only count doors knocked where the result was canvassed AKA contacted
+and contacttypeid=2 --only count canvass contacts made by door knocking
+and c.datecanvassed >= (current_date)-1-extract(dow from current_date+1)::int%7 --limit to contacts made this week
+and c.datecanvassed < current_date
+and inputtypeid<>4 --exlude bulk uploads
+and p.state_code ='KY' --limit to state kentucky
+and c.committeeid = 41602 --limit to ALG committee
+then coalesce(p.primary_mailing_address_id,p.primary_voting_address_id) else null end) as dvcdoorcontacts --use addresses to count number of doors knocked rather than number of people
+,count(distinct case when --this part counts number of door attempts ever made in this phase to be used to calculate phase ptg
+contacttypeid=2 --only count canvass contacts made by door knocking
+and c.datecanvassed >= '2014-09-05' --limit to calls made this phase which start sept 5th
+and c.datecanvassed < current_date
+and inputtypeid<>4 --exludes bulk uploads
+and p.state_code ='KY' --limits to state kentucky
+and c.committeeid = 41602 --limits to ALG committee
+then coalesce(p.primary_mailing_address_id,p.primary_voting_address_id) else null end) as dvcdoorattemptsever --use addresses to count number of doors knocked rather than number of people
+into aomalley.dvc --inserts into new table
+from c2014_ky_coord_vansync.contacthistoryexport c
+left join analytics_ky.person p on p.state_code=c.state and p.votebuilder_identifier=c.vanid --left joins to person table to be able to used addresses
+left join c2014_ky_coord_vansync.turfexport t on t.state=c.state and t.committeeid<>5755 and t.precinctid=p.vanprecinctid --joins to get fonames
+where t.foname not like '%CO%' --excludes campus organizers
+GROUP BY 1,2
+order by 1,2,3,4,5;
+-------------------------------****GET Completed Phone & Door Shifts
+drop table dvcshiftscomp;--drop old table for shifts completed
+select
+act.regionname --select region from using activity based turf
+,act.foname --select fo name from using activity based turf
+,count (case when
+(e.eventtypename = 'Canvass' and e.mrr_statusname = 'Completed')
+or (e.eventid in (14729,14730,14737,14738,14718,14719,14720,14721) and e.volunteeractivityname='Canvasser' and e.mrr_statusname = 'Completed')
+then e.myc_vanid else null end) as canvasscomp --****count vanid to count number of people who completed shifts
+,count (case when
+(e.eventtypename = 'Phone Bank' and e.mrr_statusname = 'Completed')
+or (e.eventid in (14729,14730,14737,14738,14718,14719,14720,14721) and e.volunteeractivityname='Caller' and e.mrr_statusname = 'Completed')
+then e.myc_vanid else null end) as phonecomp --****count vanid to count number of people who completed shifts
+into aomalley.dvcshiftscomp --insert into table
+from c2014_ky_coord_vansync.activityturfexport as act
+left join c2014_ky_coord_vansync.event_attendees_2014 as e on e.myc_vanid = act.vanid
+where act.foname not like '%CO%' --excludes campus organizers
+and e.eventdate >= (current_date)-1-extract(dow from current_date+1)::int%7 --only includes shifts this reporting week
+and e.eventdate < current_date
+group by 1,2
+order by 1,2;
+----------------------------------consolidates information to export in one tab
+select
+g.region_name --doesn't actually select region names but used as a spacekeeper for formatting purposes later on
+,g.foname --select fo name from goals table
+,coalesce(d.dvcdoorattempts,0) as dvcdoorattempts --get number of dvc door attempts by fo
+,g.dvc_door_attempts as dvcdoorattemptsgoal --get this weeks goal for dvc door attempts by fo from goals table
+,coalesce((cast(d.dvcdoorattempts as float)/nullif(cast(g.dvc_door_attempts as float),0)),0) as dvcdoorattemptsptg --calculated ptg for this week by dividing number of dvc door attempts done this week by the dvc door attempts goal for this week
+,coalesce((cast(d.dvcdoorattempts as float)/nullif(cast(ds.canvasscomp as float),0)),0) as knockspershift --get number of knocks per shift by dividing number of door attempts by number of door shifts completed this week
+,coalesce((cast(d.dvcdoorcontacts as float)/nullif(cast(d.dvcdoorattempts as float),0)),0) as doorcontactrate --get contact rate for door attempts by dividing number of door contacts by number of door attempts this week
+,coalesce(d.dvcdoorattemptsever,0) as dvcdoorattemptsever --select the number of door attempts made so far this phase
+,g.door_attempts_phase --select the goal for door attempts for this entire phase
+,coalesce((cast(d.dvcdoorattemptsever as float)/nullif(cast(g.door_attempts_phase as float),0)),0) as dvcdoorattemptsphaseptg --calculate ptg for this phase by dividing the number of door attmepts made so far this phase by the door attempts goal for this phase
+,coalesce(d.dvcphoneattempts,0) as dvcphoneattempts --get number of dvc phone attempts by fo
+,g.dvc_phone_attempts as dvcphoneattemptsgoal --get this weeks goal for dvc phone attempts by fo from goals table
+,coalesce((cast(d.dvcphoneattempts as float)/nullif(cast(g.dvc_phone_attempts as float),0)),0) as dvcphoneattemptsptg --calculated ptg for this week by dividing number of dvc phone attempts done this week by the dvc phone attempts goal for this week
+,coalesce((cast(d.dvcphoneattempts as float)/nullif(cast(ds.phonecomp as float),0)),0) as callspershift --get number of calls per shift by dividing number of phone attempts by number of phone shifts completed this week
+,coalesce((cast(d.dvcphonecontacts as float)/nullif(cast(d.dvcphoneattempts as float),0)),0) as phonecontactrate --get contact rate for phone attempts by dividing number of phone contacts by number of phone attempts this week
+,coalesce(d.dvcphoneattemptsever,0) as dvcphoneattemptsever --select the number of phone attempts made so far this phase
+,g.phone_attempts_phase --select the goal for phone attempts for this entire phase
+,coalesce((cast(d.dvcphoneattemptsever as float)/nullif(cast(g.phone_attempts_phase as float),0)),0) as dvcphoneattemptsphaseptg --calculate ptg for this phase by dividing the number of phone attmepts made so far this phase by the phone attempts goal for this phase
+from aomalley.goals as g --select all region and fo names and goals from our goals table
+left join aomalley.dvc as d on d.foname=g.foname --join to get dvc attempts
+left join aomalley.dvcshiftscomp as ds on ds.foname=g.foname --join to get shifts completed to calculate per shift numbers
+where g.reporting_week = (current_date)-1-extract(dow from current_date+1)::int%7 --select goals from current reporting week only
+and g.foname is not null --do not select region names from goals table
+group by 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18
+order by 1,2;
