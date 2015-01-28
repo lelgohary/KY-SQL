@@ -1,0 +1,31 @@
+-------------------------------UNCLOSED SHIFTS TAB---------------------------------------------
+-------------------------------Get Unclosed Shifts---------------------------------------------
+drop table unclosedshifts;--drop old unclosed shifts table
+
+select
+t.regionname
+,t.foname
+,count (case when
+e.eventdate < current_date--only select shifts that occurred before today
+and e.mrr_statusname <> 'Completed'--exlude shifts with status completed
+and e.mrr_statusname <> 'No Show'--exlude shifts with status no show
+and e.mrr_statusname <> 'Declined'--exlude shifts with status declined
+then e.myc_vanid else null end) as unclosedshifts --count unclosed shifts aka ones that occurred before today and have a status other than completed, no show or declined
+into aomalley.unclosedshifts --save into new table
+from c2014_ky_coord_vansync.activityturfexport as t --join on activity based region and fo
+left join c2014_ky_coord_vansync.event_attendees_2014 as e on e.myc_vanid = t.vanid
+where t.foname not like '%CO%' --exclude campus organizers 
+group by 1,2
+order by 1,2;
+
+-------------------CREATE AND EXPORT TAB
+select
+g.region_name--not actually selected but included to use as a space saver for formatting later on 
+,g.foname
+,u.unclosedshifts as unclosedshifts --select count of unclosed shifts from the unclosedshifts table
+from aomalley.goals g --select fonames from goals table 
+left join aomalley.unclosedshifts u on g.foname = u.foname --join to get count of unclosed shifts per fo
+where g.foname is not null --don't include region names 
+and g.reporting_week = (current_date)-1-extract(dow from current_date+1)::int%7 --only select fonames for this week (eliminates old fos that no longer exist from previous weeks)
+group by 1,2,3
+order by 1,2,3;
