@@ -1,0 +1,230 @@
+-------------------------------------DVC SHIFTS TAB
+-----------------------------GET DVC shifts completed & scheduled
+drop table dvcshifts;--drop old dvc shifts table 
+
+select
+t.regionname
+,t.foname
+,count (case when
+e.eventdate >= (current_date)-1-extract(dow from current_date+1)::int%7 --count only shifts this week
+and e.eventdate < current_date
+and e.mrr_statusname = 'Completed'--count only shifts with status completed
+and (e.eventtypename = 'Canvass' or (e.volunteeractivityname='Canvasser' and e.eventid in (14729,14730,14737,14738,14718,14719,14720,14721)))--count only shifts with type canvass 
+then e.myc_vanid else null end) as canvasscomp --count to get number of canvass shifts completed this week
+,count (case when
+e.eventdate >= '2014-09-05' --count only shifts completed after the start of this phase on sept 5th
+and e.eventdate < current_date
+and e.mrr_statusname = 'Completed' --select only shifts with status complted 
+and (e.eventtypename = 'Canvass' or (e.volunteeractivityname='Canvasser' and e.eventid in (14729,14730,14737,14738,14718,14719,14720,14721)))
+then e.myc_vanid else null end) as canvasscompever--count to get number of canvass shifts completed this phase
+,count (case when
+e.eventdate >= current_date --count only shifts between now and the end of this reporting week
+and e.eventdate < (current_date)+6-extract(dow from current_date+1)
+and e.mrr_statusname = 'Scheduled' --count only shifts with status scheduled 
+and (e.eventtypename = 'Canvass' or (e.volunteeractivityname='Canvasser' and e.eventid in (14729,14730,14737,14738,14718,14719,14720,14721)))
+then e.myc_vanid else null end) as canvassschedtw --count to get number of canvss shifts scheduled for the rest of this week
+,count (case when
+e.eventdate >= current_date--count only shifts between now and the end of this reporting week
+and e.eventdate < (current_date)+6-extract(dow from current_date+1)--count only shifts between now and the end of this reporting week
+and e.mrr_statusname = 'Confirmed'--count only shifts with status confirmed
+and (e.eventtypename = 'Canvass' or (e.volunteeractivityname='Canvasser' and e.eventid in (14729,14730,14737,14738,14718,14719,14720,14721)))
+then e.myc_vanid else null end) as canvassconftw--count to get number of canvss shifts confirmed for the rest of this week
+,count (case when
+e.eventdate >= current_date--count only shifts between now and the end of this reporting week
+and e.eventdate < (current_date)+6-extract(dow from current_date+1)--count only shifts between now and the end of this reporting week
+and e.mrr_statusname = 'Conf Twice'--count only shifts with status conf twice
+and (e.eventtypename = 'Canvass' or (e.volunteeractivityname='Canvasser' and e.eventid in (14729,14730,14737,14738,14718,14719,14720,14721)))
+then e.myc_vanid else null end) as canvassconftwicetw--count to get number of canvss shifts conf twice for the rest of this week
+,count (case when
+e.eventdate >= current_date--count only shifts between now and the end of this reporting week
+and e.eventdate <(current_date)+6-extract(dow from current_date+1)--count only shifts between now and the end of this reporting week
+and e.mrr_statusname = 'Left Msg'--count only shifts with status left msg
+and (e.eventtypename = 'Canvass' or (e.volunteeractivityname='Canvasser' and e.eventid in (14729,14730,14737,14738,14718,14719,14720,14721)))
+then e.myc_vanid else null end) as canvassleftmsgtw--count to get number of canvss shifts with status left msg for the rest of this week
+,count (case when
+e.eventdate >= current_date--count only shifts between now and the end of this reporting week
+and e.eventdate < (current_date)+6-extract(dow from current_date+1)--count only shifts between now and the end of this reporting week
+and e.mrr_statusname = 'Invited'--count only shifts with status invited
+and (e.eventtypename = 'Canvass' or (e.volunteeractivityname='Canvasser' and e.eventid in (14729,14730,14737,14738,14718,14719,14720,14721)))
+then e.myc_vanid else null end) as canvassinvitedtw--count to get number of canvss shifts with status invited for the rest of this week
+,count (case when
+e.eventdate >= (current_date)-1-extract(dow from current_date+1)::int%7--count only shifts this week
+and e.eventdate < current_date
+and e.mrr_statusname = 'Completed'--count only shifts with status completed 
+and (e.eventtypename = 'Phone Bank' or (e.volunteeractivityname='Caller' and e.eventid in (14729,14730,14737,14738,14718,14719,14720,14721)))
+then e.myc_vanid else null end) as phonecomp--count number of phone bank shifts completed this week 
+,count (case when
+e.eventdate >= '2014-09-05'--count only shifts this phase
+and e.eventdate < current_date
+and e.mrr_statusname = 'Completed'--count only shifts with status completed 
+and (e.eventtypename = 'Phone Bank' or (e.volunteeractivityname='Caller' and e.eventid in (14729,14730,14737,14738,14718,14719,14720,14721)))
+then e.myc_vanid else null end) as phonecompever--count number of phone bank shifts completed this phase
+,count (case when
+e.eventdate >= current_date--count only shifts between now and the end of this reporting week
+and e.eventdate < (current_date)+6-extract(dow from current_date+1)--count only shifts between now and the end of this reporting week
+and e.mrr_statusname = 'Scheduled'--count only shifts with status scheduled
+and (e.eventtypename = 'Phone Bank' or (e.volunteeractivityname='Caller' and e.eventid in (14729,14730,14737,14738,14718,14719,14720,14721)))
+then e.myc_vanid else null end) as phoneschedtw--count number of phone bank shifts scheduled for the rest of this week 
+,count (case when
+e.eventdate >= current_date--count only shifts between now and the end of this reporting week
+and e.eventdate < (current_date)+6-extract(dow from current_date+1)--count only shifts between now and the end of this reporting week
+and e.mrr_statusname = 'Confirmed'--count only shifts with status confirmed
+and (e.eventtypename = 'Phone Bank' or (e.volunteeractivityname='Caller' and e.eventid in (14729,14730,14737,14738,14718,14719,14720,14721)))
+then e.myc_vanid else null end) as phoneconftw--count number of phone bank shifts confirmed for the rest of this week 
+,count (case when
+e.eventdate >= current_date--count only shifts between now and the end of this reporting week
+and e.eventdate < (current_date)+6-extract(dow from current_date+1)--count only shifts between now and the end of this reporting week
+and e.mrr_statusname = 'Conf Twice'--count only shifts with status conf twice
+and (e.eventtypename = 'Phone Bank' or (e.volunteeractivityname='Caller' and e.eventid in (14729,14730,14737,14738,14718,14719,14720,14721))) 
+then e.myc_vanid else null end) as phoneconftwicetw--count number of phone bank shifts with status conf twice for the rest of this week 
+,count (case when
+e.eventdate >= current_date--count only shifts between now and the end of this reporting week
+and e.eventdate <(current_date)+6-extract(dow from current_date+1)--count only shifts between now and the end of this reporting week
+and e.mrr_statusname = 'Left Msg'--count only shifts with status left msg
+and (e.eventtypename = 'Phone Bank' or (e.volunteeractivityname='Caller' and e.eventid in (14729,14730,14737,14738,14718,14719,14720,14721)))
+then e.myc_vanid else null end) as phoneleftmsgtw--count number of phone bank shifts with status left msg for the rest of this week 
+,count (case when
+e.eventdate >= current_date--count only shifts between now and the end of this reporting week
+and e.eventdate <(current_date)+6-extract(dow from current_date+1)--count only shifts between now and the end of this reporting week
+and e.mrr_statusname = 'Invited'--count only shifts with status invited
+and (e.eventtypename = 'Phone Bank' or (e.volunteeractivityname='Caller' and e.eventid in (14729,14730,14737,14738,14718,14719,14720,14721)))
+then e.myc_vanid else null end) as phoneinvitedtw--count number of phone bank shifts with status invited for the rest of this week 
+,count (case when
+e.eventdate >=(current_date)+6-extract(dow from current_date+1)--count only shifts next week
+and e.eventdate < (current_date)+14-extract(dow from current_date+2)::int%7--count only shifts next week
+and e.mrr_statusname = 'Scheduled'--count only shifts with status scheduled
+and (e.eventtypename = 'Canvass' or (e.volunteeractivityname='Canvasser' and e.eventid in (14729,14730,14737,14738,14718,14719,14720,14721)))
+then e.myc_vanid else null end) as canvassschednw--count number of canvass shifts with status scheduled for next week 
+,count (case when
+e.eventdate >= (current_date)+6-extract(dow from current_date+1)--count only shifts next week
+and e.eventdate < (current_date)+14-extract(dow from current_date+2)::int%7--count only shifts next week
+and e.mrr_statusname = 'Confirmed'--count only shifts with status confirmed
+and (e.eventtypename = 'Canvass' or (e.volunteeractivityname='Canvasser' and e.eventid in (14729,14730,14737,14738,14718,14719,14720,14721)))
+then e.myc_vanid else null end) as canvassconfnw--count number of canvass shifts with status confirmed for next week 
+,count (case when
+e.eventdate >= (current_date)+6-extract(dow from current_date+1)--count only shifts next week
+and e.eventdate < (current_date)+14-extract(dow from current_date+2)::int%7--count only shifts next week
+and e.mrr_statusname = 'Conf Twice'--count only shifts with status conf twice
+and (e.eventtypename = 'Canvass' or (e.volunteeractivityname='Canvasser' and e.eventid in (14729,14730,14737,14738,14718,14719,14720,14721)))
+then e.myc_vanid else null end) as canvassconftwicenw--count number of canvass shifts with status conf twice  for next week
+,count (case when
+e.eventdate >= (current_date)+6-extract(dow from current_date+1)--count only shifts next week
+and e.eventdate < (current_date)+14-extract(dow from current_date+2)::int%7--count only shifts next week
+and e.mrr_statusname = 'Left Msg'--count only shifts with status left msg
+and (e.eventtypename = 'Canvass' or (e.volunteeractivityname='Canvasser' and e.eventid in (14729,14730,14737,14738,14718,14719,14720,14721)))
+then e.myc_vanid else null end) as canvassleftmsgnw--count number of canvass shifts with status left msg for next week
+,count (case when
+e.eventdate >= (current_date)+6-extract(dow from current_date+1)--count only shifts next week
+and e.eventdate < (current_date)+14-extract(dow from current_date+2)::int%7--count only shifts next week
+and e.mrr_statusname = 'Invited'--count only shifts with status invited
+and (e.eventtypename = 'Canvass' or (e.volunteeractivityname='Canvasser' and e.eventid in (14729,14730,14737,14738,14718,14719,14720,14721)))
+then e.myc_vanid else null end) as canvassinvitednw--count number of canvass shifts with status invited for next week
+,count (case when
+e.eventdate >= (current_date)+6-extract(dow from current_date+1)--count only shifts next week
+and e.eventdate < (current_date)+14-extract(dow from current_date+2)::int%7--count only shifts next week
+and e.mrr_statusname = 'Scheduled'--count only shifts with status scheduled
+and (e.eventtypename = 'Phone Bank' or (e.volunteeractivityname='Caller' and e.eventid in (14729,14730,14737,14738,14718,14719,14720,14721)))
+then e.myc_vanid else null end) as phoneschednw--count number of phone bank shifts with status scheduled for next week
+,count (case when
+e.eventdate >= (current_date)+6-extract(dow from current_date+1)--count only shifts next week
+and e.eventdate < (current_date)+14-extract(dow from current_date+2)::int%7--count only shifts next week
+and e.mrr_statusname = 'Confirmed'--count only shifts with status confirmed
+and (e.eventtypename = 'Phone Bank' or (e.volunteeractivityname='Caller' and e.eventid in (14729,14730,14737,14738,14718,14719,14720,14721)))
+then e.myc_vanid else null end) as phoneconfnw--count number of phone bank shifts with status confirmed for next week
+,count (case when
+e.eventdate >= (current_date)+6-extract(dow from current_date+1)--count only shifts next week
+and e.eventdate < (current_date)+14-extract(dow from current_date+2)::int%7--count only shifts next week
+and e.mrr_statusname = 'Conf Twice'--count only shifts with status conf twice
+and (e.eventtypename = 'Phone Bank' or (e.volunteeractivityname='Caller' and e.eventid in (14729,14730,14737,14738,14718,14719,14720,14721)))
+then e.myc_vanid else null end) as phoneconftwicenw--count number of phone bank shifts with status conf twice for next week
+,count (case when
+e.eventdate >= (current_date)+6-extract(dow from current_date+1)--count only shifts next week
+and e.eventdate < (current_date)+14-extract(dow from current_date+2)::int%7--count only shifts next week
+and e.mrr_statusname = 'Left Msg'--count only shifts with status left msg
+and (e.eventtypename = 'Phone Bank' or (e.volunteeractivityname='Caller' and e.eventid in (14729,14730,14737,14738,14718,14719,14720,14721)))
+then e.myc_vanid else null end) as phoneleftmsgnw--count number of phone bank shifts with status left msg for next week
+,count (case when
+e.eventdate >= (current_date)+6-extract(dow from current_date+1)--count only shifts next week
+and e.eventdate < (current_date)+14-extract(dow from current_date+2)::int%7--count only shifts next week
+and e.mrr_statusname = 'Invited'--count only shifts with status invited
+and (e.eventtypename = 'Phone Bank' or (e.volunteeractivityname='Caller' and e.eventid in (14729,14730,14737,14738,14718,14719,14720,14721)))
+then e.myc_vanid else null end) as phoneinvitednw--count number of phone bank shifts with status invited for next week
+into aomalley.dvcshifts --save into new table
+from c2014_ky_coord_vansync.activityturfexport as t --join on activity based region 
+left join c2014_ky_coord_vansync.event_attendees_2014 as e on e.myc_vanid = t.vanid
+where t.foname not like '%CO%' --exclude campus organizers 
+and e.volunteeractivityname not like '%Host%'
+group by 1,2
+order by 1,2;
+-----------------------------------GET & CALCULATE DVC shifts needed for next week
+drop table aomalley.dvcneedednw; --drop old dvc needed next week table 
+
+select
+g.region_name
+,g.foname
+--calculate canvass shifts needed next week by subtracting the sum of canvass shifts with status sched/conf/conftwice/leftmsg for next week from the dvc door shift goal for next week*2
+,case when (r.canvassschednw+r.canvassconfnw+r.canvassconftwicenw+r.canvassleftmsgnw) <= g.dvc_door_shifts then ((g.dvc_door_shifts*2)-(r.canvassschednw+r.canvassconfnw+r.canvassconftwicenw+r.canvassleftmsgnw)) else 0 end as dvccanvassneedednw
+--calculate phone shifts needed next week by subtracting the sum of phone shifts with status sched/conf/conftwice/leftmsg for next week from the dvc phone shift goal for next week*2
+,case when (r.phoneschednw+r.phoneconfnw+r.phoneconftwicenw+r.phoneleftmsgnw) <= g.dvc_phone_shifts then ((g.dvc_phone_shifts*2)-(r.phoneschednw+r.phoneconfnw+r.phoneconftwicenw+r.phoneleftmsgnw)) else 0 end as dvcphoneneedednw
+,g.dvc_door_shifts as canvassgoalsnw --select the door shifts goal for next week
+,g.dvc_phone_shifts as phonegoalsnw --select the phone shifts goal for next week
+--calculate the door shifts ptg for next week by dividing the sum of canvass shifts with status sched/conf/conftwice/leftmsg for next week by the dvc door shift goal for next week*2 
+,coalesce((cast((r.canvassschednw+r.canvassconfnw+r.canvassconftwicenw+r.canvassleftmsgnw) as float)/nullif(cast(g.dvc_door_shifts*2 as float),0)),0) as dvcdoorshiftsptgnw
+--calculate the phone shifts ptg for next week by dividing the sum of phoen shifts with status sched/conf/conftwice/leftmsg for next week by the dvc phone shift goal for next week*2 
+,coalesce((cast((r.phoneschednw+r.phoneconfnw+r.phoneconftwicenw+r.phoneleftmsgnw) as float)/nullif(cast(g.dvc_phone_shifts*2 as float),0)),0) as dvcphoneshiftsptgnw
+into aomalley.dvcneedednw --save into new table
+from aomalley.goals as g
+left join aomalley.dvcshifts as r on r.foname=g.foname --left join dvcshifts table to incorporate all next week canvass and phone shift numbers 
+where g.reporting_week = (current_date)+6-extract(dow from current_date+1) --select only goals from next reporting week 
+group by 1,2,3,4,5,6,7,8
+order by 1,2,3,4,5,6,7,8;
+
+-------------------------------------------------create tab for export 
+select
+g.region_name --not actually selected just used as a placeholder for formatting 
+,g.foname
+,coalesce(r.canvasscomp,0) as canvasscomp -- select canvass shifts completed this week
+,coalesce(r.canvassschedtw,0) as canvassschedtw-- select canvass shifts scheduled for the rest of this week
+,coalesce(r.canvassconftw,0) as canvassconftw-- select canvass shifts confirmed for the rest of this week
+,coalesce(r.canvassconftwicetw,0) as canvassconftwicetw-- select canvass shifts conf twice for the rest of this week
+,coalesce(r.canvassleftmsgtw,0) as canvassleftmsgtw-- select canvass shifts left msg for the rest of this week
+,coalesce(r.canvassinvitedtw,0) as canvassinvitedtw-- select canvass shifts invited for the rest of this week
+,g.dvc_door_shifts as dvcdoorshiftgoal-- select canvass shifts goal for this week
+,coalesce((cast(r.canvasscomp as float)/nullif(cast(g.dvc_door_shifts as float),0)),0) as dvcdoorshiftsptg --calculate canvass shifts ptg for this week by dividing the number of shifts completed by the door shifts goal for this week
+,case when r.canvasscomp <= g.dvc_door_shifts then (g.dvc_door_shifts - r.canvasscomp)*2 else 0 end as canvassneeded --calculate canvass shifts needed for this week by subtracting the number of shifts completed from the goal and multiplying the result by 2
+,coalesce(r.phonecomp,0) as phonecomp -- select phone shifts completed this week
+,coalesce(r.phoneschedtw,0) as phoneschedtw-- select phone shifts scheduled for the rest of this week
+,coalesce(r.phoneconftw,0) as phoneconftw-- select phone shifts confirmed for the rest of this week
+,coalesce(r.phoneconftwicetw,0) as phoneconftwicetw-- select phone shifts conf twice for the rest of this week
+,coalesce(r.phoneleftmsgtw,0) as phoneleftmsgtw-- select phone shifts left msg for the rest of this week
+,coalesce(r.phoneinvitedtw,0) as phoneinvitedtw-- select phone shifts invited for the rest of this week
+,g.dvc_phone_shifts as dvcphoneshiftgoal -- select phone shifts goal for this week
+,coalesce((cast(r.phonecomp as float)/nullif(cast(g.dvc_phone_shifts as float),0)),0) as dvcphoneshiftsptg--calculate phone shifts ptg for this week by dividing the number of shifts completed by the phone shifts goal for this week
+,case when r.phonecomp <= g.dvc_phone_shifts then (g.dvc_phone_shifts - r.phonecomp)*2 else 0 end as phoneneeded--calculate phone shifts needed for this week by subtracting the number of shifts completed from the goal and multiplying the result by 2
+,coalesce(r.canvassschednw,0) as canvassschednw--select canvass shifts scheduled for next week
+,coalesce(r.canvassconfnw,0) as canvassconfnw--select canvass shifts confirmed for next week
+,coalesce(r.canvassconftwicenw,0) as canvassconftwicenw--select canvass shifts conf twice for next week
+,coalesce(r.canvassleftmsgnw,0) as canvassleftmsgnw--select canvass shifts left msg for next week
+,coalesce(r.canvassinvitednw,0) as canvassinvitednw--select canvass shifts invited for next week
+,coalesce(n.canvassgoalsnw,0) as canvassgoalsnw --select canvass shifts goal for next week from the next week table 
+--calculate the door shifts ptg for next week by dividing the sum of canvass shifts sched/conf/conftwice/leftmsg for next week by the canvass shift goal for next week multiplied by 2
+,coalesce((cast((r.canvassschednw+r.canvassconfnw+r.canvassconftwicenw+r.canvassleftmsgnw) as float)/nullif(cast((n.canvassgoalsnw*2) as float),0)),0) as dvcdoorshiftsptgnw 
+--calculate the needed canvass shifts for next week by substracting the sum of canvass shifts sched/conf/conftwice/leftmsg for next week from the canvass shift goal for next week multiplied by 2
+,case when (n.canvassgoalsnw*2) >= (r.canvassschednw+r.canvassconfnw+r.canvassconftwicenw+r.canvassleftmsgnw) then (n.canvassgoalsnw*2) - (r.canvassschednw+r.canvassconfnw+r.canvassconftwicenw+r.canvassleftmsgnw) else 0 end as canvassneedednw
+,coalesce(r.phoneschednw,0) as phoneschednw--select phone shifts scheduled for next week
+,coalesce(r.phoneconfnw,0) as phoneconfnw--select phone shifts confirmed for next week
+,coalesce(r.phoneconftwicenw,0) as phoneconftwicenw--select phone shifts confirmed twice for next week
+,coalesce(r.phoneleftmsgnw,0) as phoneleftmsgnw--select phone shifts left msg for next week
+,coalesce(r.phoneinvitednw,0) as phoneinvitednw--select phone shifts invited for next week
+,coalesce(n.phonegoalsnw,0) as phonegoalsnw--select phone shifts goals for next week from the next week table 
+--calculate the phone shifts ptg for next week by dividing the sum of phone shifts sched/conf/conftwice/leftmsg for next week by the phone shift goal for next week multiplied by 2
+,coalesce((cast((r.phoneschednw+r.phoneconfnw+r.phoneconftwicenw+r.phoneleftmsgnw) as float)/nullif(cast((n.phonegoalsnw*2) as float),0)),0) as dvcphoneshiftsptgnw
+--calculate the needed phone shifts for next week by substracting the sum of phone shifts sched/conf/conftwice/leftmsg for next week from the phone shift goal for next week multiplied by 2
+,case when (n.phonegoalsnw*2) >= (r.phoneschednw+r.phoneconfnw+r.phoneconftwicenw+r.phoneleftmsgnw) then (n.phonegoalsnw*2) - (r.phoneschednw+r.phoneconfnw+r.phoneconftwicenw+r.phoneleftmsgnw) else 0 end as phoneneedednw
+from aomalley.goals g
+left join aomalley.dvcshifts as r on r.foname=g.foname --join dvcshifts to incorporate all shift counts for this week
+left join aomalley.dvcneedednw as n on n.foname=g.foname--join dvcneedednw to incorporate all shift goals, ptgs and needed calculations for next week  
+where g.reporting_week = (current_date)-1-extract(dow from current_date+1)::int%7--select goals only from this reporting week
+and g.foname is not null --do not select region name since doesn't have goals 
+group by 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36
+order by 1,2;
