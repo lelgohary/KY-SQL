@@ -1,0 +1,99 @@
+-------------------------------------------------------------------------------VOL REC TAB----------------------------------------------------------------------------------------
+drop table aomalley.dailyvolrec;--drop old vol rec table
+--get number of vol recruitment calls made this week by fo
+select
+--TURF COMPONENTS INCLUDING 'UNTURFED' SUBSTITUTION FOR INCOMPLETE OR NULL TURFING
+case when p.precinctid is null and act.teamname is null then 'Unturfed' when p.precinctid is null then act.regionname when t.teamname is null then 'Unturfed' else t.regionname end as "regionname"
+,case when p.precinctid is null and act.teamname is null then 'Unturfed' when p.precinctid is null then act.foname when t.teamname is null then 'Unturfed' else t.foname end as "foname"
+,count(c.vanid) as volcallattempts
+,count(case when resultid=14 then c.vanid else null end) as volcallcontacts
+into aomalley.dailyvolrec
+from c2014_ky_coord_vansync.contacthistoryexportmc c
+join c2014_ky_coord_vansync.mycampaignperson p using (state,vanid) --ATTACH MYCAMPAIGNPERSON TO IGNORE DELETED RECORDS AND JOIN TURF
+left join c2014_ky_coord_vansync.turfexport t using (state,precinctid) --ATTACH TURFEXPORT TO APPLY LOCATION-BASED REGIONS
+left join c2014_ky_coord_vansync.activityturfexport act using (state,vanid) --ATTACH ACTIVITYTURFEXPORT TO APPLY ACTIVITY-BASED REGIONS
+where datecanvassed>=(current_date)-1-extract(dow from current_date+1)::int%7 and contacttypeid=1 and inputtypeid<>4 --LIMITS RESULTS TO PHONE (CONTACTTYPEID=1), NON-BULK UPLOADS (INPUTTYPEID=4)
+and c.committeeid =41602 --LIMITS RESULTS TO COMMITTEES WE ARE USING
+and datecanvassed < current_date
+group by 1,2
+order by 1,2;
+--****One on ones
+drop table aomalley.oneonones; --drop old one on ones table
+select t.foname,
+count(case when
+e.eventdate < current_date
+and e.eventdate >= (current_date)-1-extract(dow from current_date+1)::int%7 --limit to shifts this week
+and e.eventtypename='1-on-1'--limit to shifts with type one on one
+and e.mrr_statusname='Completed'--limit to shifts with status completed
+then e.myc_vanid else null end) as oneononescomp, --****count vanid to get number of peope who completed a one on one shift this week
+count(case when
+e.eventdate >= current_date
+and e.eventdate < (current_date)+6-extract(dow from current_date+1)
+and e.eventtypename='1-on-1'
+and (e.mrr_statusname='Scheduled'
+or e.mrr_statusname='Confirmed'
+or e.mrr_statusname='Conf Twice'
+or e.mrr_statusname='Left Msg')
+then e.myc_vanid else null end) as oneononesschedrow,--****count number of people scheduled for a one on one shift for the rest of this week
+count(case when
+e.eventdate >= (current_date)+6-extract(dow from current_date+1)
+and e.eventdate < (current_date)+14-extract(dow from current_date+2)::int%7
+and e.eventtypename='1-on-1'
+and (e.mrr_statusname='Scheduled'
+or e.mrr_statusname='Confirmed'
+or e.mrr_statusname='Conf Twice'
+or e.mrr_statusname='Left Msg')
+then e.myc_vanid else null end) as oneononesschednw--****count number of people scheduled for a one on one next reporting week
+into aomalley.oneonones
+from c2014_ky_coord_vansync.event_attendees_2014 as e
+left join c2014_ky_coord_vansync.activityturfexport as t on e.myc_vanid=t.vanid --join on activity based region
+where t.foname not like '%CO%' --excludes campus organizers
+and e.volunteeractivityname not like '%Host%'
+group by 1
+order by 1;
+--****DVC Shifts Recruited
+drop table aomalley.actionshifts;
+select
+t.foname
+,count(case when
+(e.eventtypename='Canvass' and e.mrr_statusname='Scheduled') --****only include shifts with status scheduled
+or (e.eventid in (14729,14730,14737,14738,14718,14719,14720,14721) and e.mrr_statusname='Scheduled' and e.volunteeractivityname='Canvasser')
+then e.myc_vanid else null end) as canvassshiftsched--count to get number of door shifts recruited this week
+,count(case when
+(e.eventtypename='Phone Bank' and e.mrr_statusname='Scheduled') --****only include shifts with status scheduled
+or (e.eventid in (14729,14730,14737,14738,14718,14719,14720,14721) and e.mrr_statusname='Scheduled' and e.volunteeractivityname='Caller')
+then e.myc_vanid else null end) as phoneshiftsched --count to get number of phone shifts recruited this week
+into aomalley.actionshifts --save into a new table
+from c2014_ky_coord_vansync.event_attendees_2014 as e
+left join c2014_ky_coord_vansync.activityturfexport as t on e.myc_vanid=t.vanid --join on activity based region and fo
+where t.foname not like '%CO%' --exclude campus organizers
+and e.statusdate <= current_date
+and e.statusdate >= (current_date)-1-extract(dow from current_date+1)::int%7
+and e.volunteeractivityname not like '%Host%'
+group by 1
+order by 1;
+
+-------------------------------CREATE AND EXPORT TAB
+select
+g.region_name --not actually selected but used as a placeholder for formatting
+,g.foname
+,coalesce(v.volcallattempts,0) as volcallattempts --select vol rec call attmepts made this week
+,coalesce(v.volcallcontacts,0) as volcallcontacts --select vol rec call contacts made this week
+,g.vol_recruitment as volrecattemptsgoal--select the vol rec call attempts goal for this week from the goals table
+,coalesce((cast(v.volcallattempts as float)/nullif(cast(g.vol_recruitment as float),0)),0) as volrecptg -- calculate the vol rec call ptg for this week by dividing the number of call attempts by the goal for this week
+,coalesce((cast(v.volcallcontacts as float)/nullif(cast(v.volcallattempts as float),0)),0) as volreccontactrate --calculate the vol rec call contact rate by divicing the number of contacts by the number of attempts
+,coalesce(o.oneononescomp,0) as oneononescomp --selec the number of one on ones completed this week
+,coalesce(o.oneononesschedrow,0) as oneononesschedrow --select the number of one on ones sheduled for the rest of this week
+,coalesce(o.oneononesschednw,0) as oneononesschednw --select the number of one on one scheduled for next week
+,g.One_on_Ones as oneononesgoal --select the one on ones completed goal for this week
+,coalesce((cast(o.oneononescomp as float)/nullif(cast(g.One_on_Ones as float),0)),0) as oneononesptg --calculate the one on ones ptg by dividing the number copmleted by the goal
+,coalesce(a.canvassshiftsched,0) as canvassshiftsched --select the number of door shifts recruited this week
+,coalesce(a.phoneshiftsched,0) as phoneshiftsched--select the number of phone shifts recruited this week
+from aomalley.goals g --select foname and goals from the goals table
+left join aomalley.dailyvolrec v on g.foname=v.foname
+left join aomalley.oneonones o on g.foname = o.foname
+left join aomalley.actionshifts a on g.foname=a.foname
+where g.reporting_week = (current_date)-1-extract(dow from current_date+1)::int%7 --only select goals for current reporting week
+and g.foname is not null --don't select region names since don't have goals
+group by 1,2,3,4,5,6,7,8,9,10,11,12,13,14
+order BY 1,2;
