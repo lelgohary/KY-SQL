@@ -1,0 +1,156 @@
+-----------------------------------------------------LEADER BOARD TAB-----------------------------------------------------
+----------------------------------------Get # of Active Vols
+drop table aomalley.activevols; --drop old active vols table
+select
+act.foname
+,count (distinct e.myc_vanid) as all_active_vols_30
+into aomalley.activevols
+from c2014_ky_coord_vansync.event_attendees_2014 e
+left join c2014_ky_coord_vansync.activityturfexport act on e.myc_vanid= act.vanid --join based on activity turf export
+where e.eventdate >= current_date - 30 --only include vols who have done an event in the past 30 days
+and e.eventdate < current_date
+and e.mrr_statusname='Completed' --only include those who have completed a shift
+and (e.eventtypename='Canvass' --only include those who have completed an action shift
+or e.eventtypename='Phone Bank'
+or e.eventtypename='Vol Recruitment'
+or e.eventtypename='Voter Registration'
+or e.eventid in (14729,14730,14737,14738,14718,14719,14720,14721))
+and e.volunteeractivityname not like '%Host%'
+group by 1;
+---------------------------------Vol Rec Contacts
+--drop old vol rec table
+drop table aomalley.volreccontactslb;
+select
+--TURF COMPONENTS INCLUDING 'UNTURFED' SUBSTITUTION FOR INCOMPLETE OR NULL TURFING
+case when p.precinctid is null and act.teamname is null then 'Unturfed' when p.precinctid is null then act.foname when t.teamname is null then 'Unturfed' else t.foname end as "foname"
+,count(case when resultid=14 then c.vanid else null end) as volreccallcontacts
+--save into table
+into aomalley.volreccontactslb
+from c2014_ky_coord_vansync.contacthistoryexportmc c
+join c2014_ky_coord_vansync.mycampaignperson p using (state,vanid) --ATTACH MYCAMPAIGNPERSON TO IGNORE DELETED RECORDS AND JOIN TURF
+left join c2014_ky_coord_vansync.turfexport t using (state,precinctid) --ATTACH TURFEXPORT TO APPLY LOCATION-BASED REGIONS
+left join c2014_ky_coord_vansync.activityturfexport act using (state,vanid) --ATTACH ACTIVITYTURFEXPORT TO APPLY ACTIVITY-BASED REGIONS
+where datecanvassed>=(current_date)-1-extract(dow from current_date+1)::int%7 and contacttypeid=1 and inputtypeid<>4 --LIMITS RESULTS TO PHONE (CONTACTTYPEID=1), NON-BULK UPLOADS (INPUTTYPEID=4)
+and c.committeeid =41602 --LIMITS RESULTS TO COMMITTEES WE ARE USING
+and datecanvassed < current_date
+and act.foname not like '%CO%' --excludes campus organizers from result set
+and act.foname not like '%Outliers%' --excludes outliers from result set
+and act.foname <>'Out of Commonwealth' --excludes OOCW from result set
+and t.foname not like '%CO%' --excludes campus organizers from result set
+and t.foname not like '%Outliers%' --excludes outliers from result set
+and t.foname <>'Out of Commonwealth' --excludes OOCW from result set
+group by 1
+order by 2 desc --orders results by vol rec contacts in descending order
+limit 5; --limits results to top 5 organizers to be included in leaderboard
+----------------------------------------1:1s
+--drop old one on ones table
+drop table aomalley.oneononeslb;
+select
+act.foname
+,count(case when
+e.eventdate < current_date --include only one on ones before today
+and e.eventdate >= (current_date)-1-extract(dow from current_date+1)::int%7 --include only one on ones this week
+and e.eventtypename='1-on-1' --include only event type one on one
+and e.mrr_statusname='Completed' --include only completed one on ones
+then e.myc_vanid else null end) as volreccontacts --counts the number of vanids of people who completed one on ones
+into aomalley.oneononeslb --inserts count into new table
+from c2014_ky_coord_vansync.event_attendees_2014 as e
+left join c2014_ky_coord_vansync.activityturfexport as act on e.myc_vanid=act.vanid --ties to foname using activity based region
+where act.foname not like '%CO%'--excludes campus organizers from result set
+and act.foname not like '%Outliers%'--excludes outliers from result set
+and e.volunteeractivityname not like '%Host%'
+and act.foname <>'Out of Commonwealth'--excludes OOCW from result set
+group by 1
+order by 2 desc --orders results by one on ones copmleted in descending order
+limit 5; --limits results to top 5 organizers to be included in leaderboard
+----------------------------------------------# of Active Vols
+--drop old active vols table
+drop table aomalley.activevolslb;
+select foname,all_active_vols_30 --select foname and active vols count from code above
+into aomalley.activevolslb --inserts active vol numbers into new table
+from aomalley.activevols
+where foname <> 'Unturfed' --exludes unturfed organizers from appearing in result set
+and foname not like '%Outliers%'--excludes outliers from result set
+and foname <>'Out of Commonwealth'--excludes OOCW from result set
+group by 1,2
+order by 2 desc --orders results by active vols number in descending order
+limit 5; --limits results to top 5 organizers to be included in leaderboard
+---------------------------------# of Canvass Shifts Completed****
+--drop old completed canvass shifts table
+drop table aomalley.canvasscomplb;
+select
+act.foname
+,count(case when
+(e.eventtypename = 'Canvass' and e.mrr_statusname = 'Completed')
+or (e.eventid in (14729,14730,14737,14738,14718,14719,14720,14721) and e.volunteeractivityname='Canvasser' and e.mrr_statusname = 'Completed')
+then e.myc_vanid else null end) as canvasscomp --count number of event attendees table vanids to get number of people who completed shifts
+into aomalley.canvasscomplb --inserts foname and shifts completed count into new table
+from c2014_ky_coord_vansync.event_attendees_2014 as e --pull info from event attendees 2014 table
+left join c2014_ky_coord_vansync.activityturfexport as act on e.myc_vanid=act.vanid --select foname based on activity based region
+where act.foname not like '%CO%' --excludes campus organizers from result set
+and act.foname not like '%Outliers%' --excludes outliers from result set
+and act.foname <>'Out of Commonwealth' --excludes OOCW from result set
+and e.volunteeractivityname not like '%Host%'
+and e.eventdate < current_date
+and e.eventdate >= (current_date)-1-extract(dow from current_date+1)::int%7 --limit shifts count to those done so far this reporting week
+group by 1
+order by 2 desc --orders results by active vols number in descending order
+limit 5; --limits results to top 5 organizers to be included in leaderboard
+---------------------------------****# of Canvass Shifts Recruited
+--drop old recruited canvass shifts table
+drop table aomalley.canvassshiftsrecruitedlb;
+select
+act.foname --basing foname off activity based region
+,count(case when
+(e.eventtypename = 'Canvass' and e.mrr_statusname = 'Scheduled')
+or (e.eventid in (14729,14730,14737,14738,14718,14719,14720,14721) and e.volunteeractivityname='Canvasser' and e.mrr_statusname = 'Scheduled')
+then e.myc_vanid else null end) as canvassshiftsrecruited --count myc_vanid to get number of people who were recruited
+into aomalley.canvassshiftsrecruitedlb --insert into new table
+from c2014_ky_coord_vansync.event_attendees_2014 as e
+left join c2014_ky_coord_vansync.activityturfexport as act on e.myc_vanid=act.vanid --use activity based region
+where act.foname not like '%CO%' --excludes campus organizers from result set
+and act.foname not like '%Outliers%' --excludes outliers from result set
+and act.foname <>'Out of Commonwealth' --excludes OOCW from result set
+and e.volunteeractivityname not like '%Host%'
+and e.statusdate <= current_date
+and e.statusdate >= (current_date)-1-extract(dow from current_date+1)::int%7 --include anyone with a status change so far this week
+group by 1
+order by 2 desc --orders results by active vols number in descending order
+limit 5; --limits results to top 5 organizers to be included in leaderboard
+---------------------------------# of Door Knock Attempts
+--drop old door knock attempts table
+drop table aomalley.doorknockattemptslb;
+select
+t.foname
+,count(distinct case when --count distinct to count doors knocked rather than people
+c.datecanvassed >= (current_date)-1-extract(dow from current_date+1)::int%7 --count only those knocked this reporting week
+and c.datecanvassed < current_date
+and c.contacttypeid=2 --only include those canvassed with type walk
+and c.inputtypeid<>4 --remove bulk uploads
+and p.state_code ='KY' --only include those in kentucky
+and c.committeeid = 41602 --only include those in ALG committee
+then coalesce(p.primary_mailing_address_id,p.primary_voting_address_id) else null end) as doorknockattempts --counts doors not people
+into aomalley.doorknockattemptslb --insert into new table
+from c2014_ky_coord_vansync.contacthistoryexport c
+left join analytics_ky.person p on p.state_code=c.state and p.votebuilder_identifier=c.vanid --joined in order to use mailing and voting addresses to identify door numbers rather than people
+left join c2014_ky_coord_vansync.turfexport t on t.state=c.state and t.committeeid<>5755 and t.precinctid=p.vanprecinctid --used to identify foname
+where t.foname not like '%CO%' --excludes campus organizers from result set
+and t.foname not like '%Outliers%' --excludes outliers from result set
+and t.foname <>'Out of Commonwealth' --excludes OOCW from result set
+group by 1
+order by 2 desc --orders results by active vols number in descending order
+limit 5; --limits results to top 5 organizers to be included in leaderboard
+---------------------------------Combine all pieces of leaderboard for export to google doc
+select * from( --select the final output by unioning all of the previously created tables and sort by adding a sortby key
+select *, 1 sortby from aomalley.volreccontactslb --get top 5 fos by vol rec contacts
+union all
+select *, 2 sortby from aomalley.oneononeslb --get top 5 fos by one on ones completed
+union all
+select *, 3 sortby from aomalley.activevolslb --get top 5 fos by active vols
+union all
+select *, 4 sortby from aomalley.canvasscomplb --get top 5 fos by canvass shifts completed
+union all
+select *, 5 sortby from aomalley.canvassshiftsrecruitedlb --get top 5 fos by canvass shifts recruited
+union all
+select *, 6 sortby from aomalley.doorknockattemptslb) dum --get top 5 fos by door knock attempts and name the unioned output as dum
+order by sortby,volreccallcontacts desc; --ensure output ordered correctly by sorting by sortby key first
